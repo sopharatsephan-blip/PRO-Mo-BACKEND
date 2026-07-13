@@ -1,105 +1,115 @@
-const pool = require('../libs/db_pool'); 
-const dateUtils = require('../libs/date_utils'); 
+const pool = require('../libs/db_pool'); // ดึงไฟล์อ่างเก็บสายเชื่อมต่อฐานข้อมูลมาใช้งาน เพื่อติดต่อกับฐานข้อมูล
+const dateUtils = require('../libs/date_utils'); // ดึงไฟล์เครื่องมือจัดวันที่เข้ามาใช้สำหรับทำวันที่ขีดกลางฝังในตั๋ว
 module.exports = { 
-    getUserAccountById: async (accountId) => {
-        let conn;
-        let result;
+    getUserAccountById: async (accountId) => { // 1. ฟังก์ชันดึงข้อมูลผู้ใช้จากไอดี (รับ accountId เข้ามา)
+        let conn;//conn สำหรับเก็บ connection    ไปยังmariadb 
+        let result; //resule สำหรับส่งคืนผลลัพธ์การสืบค้นข้อมูลจาก mariadb
 
-        try {
-            conn = await pool.getConnection();
+        try { // ลองทำตามคำสั่งในบล็อกนี้ถ้าไม่มีอะไรพัง
+            conn = await pool.getConnection(); // หยิบสายเชื่อมต่อฐานข้อมูลที่ว่างจากอ่าง pool มาถือไว้
 
-            var sql = "SELECT account_id, account_username, account_image_url FROM user_accounts "
-                    + "WHERE account_id = ?";
+            var sql = "SELECT account_id, account_username, account_image_url FROM user_accounts " // เลือกข้อมูลไอดี, ชื่อผู้ใช้, และรูปโปรไฟล์
+                    + "WHERE account_id = ?"; // ระบุเงื่อนไขว่าต้องเป็นแถวที่ไอดีตรงกับเครื่องหมาย ?
 
-            var rows = await conn.query(sql, [accountId]);
+            var rows = await conn.query(sql, [accountId]); // รันคำสั่ง SQL โดยเอาค่า accountId มาแทนที่เครื่องหมาย ?
 
-            result = { 
-                isError: false,
-                data: rows
+            result = { // มัดก้อนผลลัพธ์เมื่อดึงสำเร็จ
+                isError: false, // แจ้งหน้าบ้านว่าดึงข้อมูลเสร็จสิ้นไม่มีพัง
+                data: rows // ส่งข้อมูลผู้ใช้ (ไอดี, ชื่อ, รูป) กลับไปโชว์ที่หน้าบ้าน
             }; 
 
-        } catch (error) {
-            result = {
-                isError: true, 
-                errorMessage: error.message
+        } catch (error) { // ทำงานทันทีหากบล็อก try ด้านบนรันพัง
+            result = { // มัดก้อนผลลัพธ์แจ้งว่าระบบพัง
+                isError: true, // บอกชัดเจนว่าเกิดข้อผิดพลาดขึ้น
+                errorMessage: error.message // ส่งข้อความสาเหตุที่แท้จริงที่ระบบพังไปให้ตรวจดู
             };
-        } finally {
-            if (conn) 
-                conn.release();
+        } finally { // ทำงานเสมอไม่ว่าจะรันผ่านหรือพังก็ตาม
+            if (conn)  // ถ้ามีสายเชื่อมต่อค้างอยู่
+                conn.release(); // ปล่อยสายเชื่อมต่อคืนกลับเข้าอ่าง pool ทันทีเพื่อประหยัดแรมเครื่อง
         } 
 
-        return result;
+        return result; // ส่งผลลัพธ์ข้อมูลผู้ใช้หรือเออร์เรอร์กลับออกไปให้ผู้เรียกใช้
     }, 
 
-    checkAuthenRequest: async (authenRequest) => {
-        let conn;
-        let result;
+    checkAuthenRequest: async (authenRequest) => { // 2. ฟังก์ชันตรวจสอบด่านที่ 1 (หาตัวตนผู้ใช้จากรหัสแฮชที่หน้าบ้านส่งมา)
+        let conn; // เตรียมกล่องเปล่าสำหรับเก็บสายเชื่อมต่อฐานข้อมูล
+        let result; // เตรียมกล่องเปล่าสำหรับเก็บผลลัพธ์
 
-        try {
-            conn = await pool.getConnection();
+        try { // ลองทำตามคำสั่งตรวจสอบในบล็อกนี้
+            conn = await pool.getConnection(); // หยิบสายเชื่อมต่อฐานข้อมูลจากอ่าง pool มาถือไว้
 
-            var sql = "SELECT account_username FROM user_accounts WHERE"
-                    + " SHA2(CONCAT(account_username, '&', ?), 256) = ?";
+            var sql = "SELECT account_username FROM user_accounts WHERE" // เลือกดึงชื่อผู้ใช้ขึ้นมาดู
+                    + " SHA2(CONCAT(account_username, '&', ?), 256) = ?"; // เงื่อนไข: นำชื่อผู้ใช้ในตารางมาต่อสายอักขระกับวันที่แล้วแปลงเป็นรหัสแฮช SHA2 เพื่อมาเทียบกับค่าที่ส่งมาว่าตรงกันไหม
 
-            var rows = await conn.query(sql, [dateUtils.getCurrentDateForToken(), authenRequest]);
+            var rows = await conn.query(sql, [dateUtils.getCurrentDateForToken(), authenRequest]); // รัน SQL โดยส่งวันที่ขีดกลาง และรหัสแฮชหน้าบ้านไปเช็ก
 
-            if (rows.length === 0) {
-                result = {
-                    isError: true,
-                    errorMessage: "ไม่พบข้อมูลผู้ใช้ในระบบ"
+            if (rows.length === 0) { // ถ้าระบบค้นหาแล้วไม่เจอข้อมูลใด ๆ กลับมาเลย (แปลว่ารหัสแฮชไม่ตรง ไม่มีผู้ใช้นี้)
+                result = { // จัดรูปแบบข้อความแจ้งเตือนความผิดพลาด
+                    isError: true, // แจ้งว่ามีข้อผิดพลาดเกิดขึ้น
+                    errorMessage: "ไม่พบข้อมูลผู้ใช้ในระบบ" // ส่งข้อความฟ้องว่าหาผู้ใช้คนนี้ไม่เจอ
                 };
-            } else {
-                result = {
-                    isError: false,
-                    data: rows
+            } else { // หากตรวจสอบผ่านและค้นเจอข้อมูลผู้ใช้จริง
+                result = { // จัดรูปแบบก้อนผลลัพธ์ส่งข้อมูลผู้ใช้กลับ
+                    isError: false, // แจ้งว่าผ่านฉลุย
+                    data: rows // ส่งข้อมูลชื่อผู้ใช้ที่ตรวจสอบผ่านกลับไป
                 };
             }
 
-        } catch (error) {
+        } catch (error) { // ทำงานทันทีถ้าบล็อกตรวจสอบรันพัง
             result = {
                 isError: true,
                 errorMessage: error.message
             };
         } finally {
-            if (conn) conn.release(); 
+            if (conn) conn.release();  // ทำงานเสร็จส่งสายเชื่อมคืนอ่าง pool เสมอ
         }
 
-        return result;
+        return result; // ส่งก้อนผลลัพธ์ตรวจสอบด่านที่ 1 กลับออกไป
     }, 
 
-    checkAccessRequest: async (authenSignature, authenToken) => {
-        let conn;
-        let result;
+    checkAccessRequest: async (authenSignature, authenToken) => { // 3. ฟังก์ชันตรวจสอบด่านที่ 2 (ตรวจสอบรหัสผ่านและความปลอดภัยก่อนจ่าย Access Token)
+        let conn; // เตรียมกล่องเปล่าสำหรับเก็บสายเชื่อมต่อฐานข้อมูล
+        let result; // เตรียมกล่องเปล่าสำหรับเก็บผลลัพธ์
 
-        try {
-            conn = await pool.getConnection();
+        try { // ลองสั่งงานระบบในบล็อกนี้
+            conn = await pool.getConnection(); // หยิบสายเชื่อมต่อฐานข้อมูลจากอ่าง pool มาถือไว้
 
-            var sql = "SELECT account_id, account_username, account_image_url FROM user_accounts WHERE "
-                + "SHA2(CONCAT(account_username, '&', account_password, '&', ?), 256) = ?";
+            var sql = "SELECT account_id, account_username, account_image_url FROM user_accounts WHERE " // ดึงข้อมูลไอดี, ชื่อ, รูป ไปให้หน้าบ้านใช้งาน
+                + "SHA2(CONCAT(account_username, '&', account_password, '&', ?), 256) = ?"; // เงื่อนไข: มัดรวมชื่อผู้ใช้, รหัสผ่าน, และตั๋วใบแรกเข้าด้วยกัน แตกออกมาเป็นรหัสลับ SHA2 แล้วเทียบว่าตรงกับลายเซ็นดิจิทัลที่หน้าบ้านส่งมาไหม
 
-            var rows = await conn.query(sql, [authenToken, authenSignature]);
+            var rows = await conn.query(sql, [authenToken, authenSignature]); // รันคำสั่ง SQL โดยยัดค่าตั๋วใบแรกและลายเซ็นเข้าไปตรวจสอบในฐานข้อมูล
 
-            if (rows.length == 0) {
-                result = {
-                    isError: true,
-                    errorMessage: "รหัสผ่านไม่ถูกต้อง"
+            if (rows.length == 0) { // ถ้าฐานข้อมูลส่องกล้องแล้วไม่เจอแถวไหนตรงเลย (แปลว่าผู้ใช้คนนี้พิมพ์รหัสผ่านผิดมา)
+                result = { // มัดก้อนเออร์เรอร์เตรียมตอบกลับ
+                    isError: true, // แจ้งว่าระบุตัวตนล้มเหลว
+                    errorMessage: "รหัสผ่านไม่ถูกต้อง" // ส่งคำแจ้งเตือนว่ารหัสผ่านไม่ถูกต้องไปโชว์บนหน้าจอแอป
                 }
-            } else {
-                result = {
-                    isError: false,
-                    data: rows
+            } else { // แต่ถ้ารหัสผ่านถูกต้องเป๊ะ ข้อมูลตรงกับในระบบ
+                result = { // มัดก้อนข้อมูลจริงเตรียมจ่ายตั๋วผ่านทาง
+                    isError: false, // แจ้งว่ารหัสผ่านถูกต้องสมบูรณ์
+                    data: rows // แนบข้อมูลไอดี ชื่อ และรูปผู้ใช้เพื่อเอาไปฝังลงใน Access Token ต่อไป
                 };
             }
-        } catch (error) {
+        } catch (error) { // หากระบบฐานข้อมูลพังกลางคัน
             result = {
                 isError: true,
                 errorMessage: error.message
             }
-        } finally {
-            if (conn)
-                conn.release();
+        } finally { // บล็อกจบงานสุดท้าย
+            if (conn) // เช็กว่าถ้าคืนสายได้
+                conn.release(); // สั่งตัดการทำงานแล้วโยนสายคืนเข้าอ่าง pool เสมอ
 
-            return result;
+            return result; // ส่งคืนก้อนข้อมูลผลลัพธ์ล็อกอินกลับออกไป
         }
     }
-}; 
+};
+
+//สรุปภาพรวมหลักการทำงาน (เข้าใจง่ายสุด ๆ เอาไว้ตอบอาจารย์):ไฟล์นี้คือ "หัวใจระบบรักษาความปลอดภัย" ค่ะ แบ่งหน้าที่ชัดเจนเป็น 3 ฟังก์ชัน:
+
+//getUserAccountById คือ ระบบดึงหน้าโปรไฟล์ทั่วไป ส่งไอดีไป ได้รูปภาพและชื่อกลับมาโชว์ในแอป
+
+//checkAuthenRequest คือ ด่านตรวจคนเข้าเมืองขั้นแรก เอาชื่อผู้ใช้มามัดรวมกับวันที่ปัจจุบันแล้วใส่รหัสแฮช SHA2 
+// เพื่อตรวจสอบว่ามีตัวตนจริงในระบบไหม
+
+//checkAccessRequest คือ ด่านตรวจกระเป๋าขั้นสุดท้าย เอาชื่อผู้ใช้ รหัสผ่าน และตั๋วมาปั่นรวมกันแล้วเข้าแฮช SHA2
+//  เพื่อตรวจว่ารหัสผ่านถูกต้องจริงไหม ถ้าถูกต้องถึงจะอนุญาตให้ปล่อยผ่าน เพื่อเอาข้อมูลไปสร้าง Access Token ส่งกลับไปให้หน้าบ้านรัน

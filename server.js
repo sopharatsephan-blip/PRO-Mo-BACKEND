@@ -1,150 +1,160 @@
-const http = require('http');
-const bp = require('body-parser');
-const express = require('express');
-const userAccountModel = require('./models/user_account');
-const jwt = require('./libs/jwt');
-const dateUtils = require('./libs/date_utils');
-const cors = require('cors');
-const app = express();
-const exercises = require('./models/exercises')
-const activities = require('./models/activities');
-app.use(bp.urlencoded({ extended: true }));
-app.use(bp.json());
-app.use(cors());
-const hostname = '127.0.0.1';
-const port = 3000;
+const http = require('http'); // ดึงโมดูลเครื่องมือสร้างเซิร์ฟเวอร์พื้นฐานของ Node.js เข้ามาใช้งาน
+const bp = require('body-parser'); // ดึงตัวแปลงข้อมูล (Body Parser) มาแปลงค่าที่ส่งมาจากหน้าบ้านให้อ่านง่าย
+const express = require('express'); // ดึง Express Framework เข้ามาเพื่อใช้จัดการเส้นทาง (Route) ของเว็บแอป
+const userAccountModel = require('./models/user_account'); // ดึงโมดูลจัดการข้อมูลผู้ใช้และระบบล็อกอินเข้ามาใช้งาน
+const jwt = require('./libs/jwt'); // ดึงระบบสร้างและตรวจสอบตั๋วความปลอดภัย JWT เข้ามาใช้งานในไฟล์นี้
+const dateUtils = require('./libs/date_utils'); // ดึงเครื่องมือสำหรับจัดรูปแบบวันที่ขีดกลางเข้ามาเตรียมใช้
+const cors = require('cors'); // ดึงระบบปลดล็อกความปลอดภัย CORS เพื่ออนุญาตให้แอปต่างที่อยู่เรียกใช้ API นี้ได้
+const app = express(); // ประกาศใช้งานระบบ Express เก็บไว้ในตัวแปร app เพื่อเป็นตัวคุมหลังบ้านหลัก
+const exercises = require('./models/exercises') // ดึงโมดูลดึงข้อมูลท่าออกกำลังกายเข้ามาใช้งานในไฟล์นี้
+const activities = require('./models/activities'); // ดึงโมดูลดึงข้อมูลกิจกรรมการออกกำลังกายเข้ามาใช้งานในไฟล์นี้
+app.use(bp.urlencoded({ extended: true })); // สั่งให้เซิร์ฟเวอร์เปิดรับข้อมูลแบบ Form-URL-Encoded ได้จากหน้าบ้าน
+app.use(bp.json()); // สั่งให้เซิร์ฟเวอร์แปลงข้อมูลที่หน้าบ้านส่งมาให้กลายเป็น JSON อัตโนมัติ
+app.use(cors()); // เปิดสวิตช์ให้แอปหน้าบ้าน (เช่น Flutter) สามารถเชื่อมต่อและดึงข้อมูลจากเว็บนี้ได้
+const hostname = '127.0.0.1'; // กำหนดชื่อที่อยู่ IP ของเซิร์ฟเวอร์จำลอง เป็นเครื่องตัวเอง (localhost)
+const port = 3000; // กำหนดหมายเลขประตู (Port) ของหลังบ้านไว้ที่ช่องทางเลข 3000
 
 
 
-app.get("/api/users", (req, res) => {
-    var response = {
-        isError: true,
-        data: "You are unauthorized for this data"
-    };
-    res.send(JSON.stringify(response));
-});
+app.get("/api/users", (req, res) => { // 1. เส้นทางจำลองสำหรับทดสอบดึงข้อมูลผู้ใช้ทั้งหมดแบบธรรมดา
+    var response = { // มัดก้อนข้อมูลตอบกลับสมมุติ
+        isError: true, // ตั้งค่าบอกว่าเกิดข้อผิดพลาดขึ้น
+        data: "You are unauthorized for this data" // ส่งคำปฏิเสธกลับไปว่าคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้
+    }; // จบก้อนข้อมูลตอบกลับ
+    res.send(JSON.stringify(response)); // แปลงก้อนข้อมูลเป็นตัวหนังสือแล้วส่งดีดกลับไปหาหน้าบ้าน
+}); // จบเส้นทางจำลองดึงข้อมูลผู้ใช้ทั้งหมด
 
-app.post("/api/multiple_by_2", (req, res) => {
-    var response = {
-        isError: false,
-        data: {
-            no1: req.body.no_1 * 2,
-            no2: req.body.no_2 * 2
-        }
-    };
-    res.send(JSON.stringify(response));
-});
+app.post("/api/multiple_by_2", (req, res) => { // 2. เส้นทางทดสอบคณิตศาสตร์ (รับค่าตัวเลขมาคูณสองกลับไป)
+    var response = { // มัดก้อนข้อมูลผลลัพธ์ใส่ตัวแปร response
+        isError: false, // บอกหน้าบ้านว่าระบบทำงานฉลุยไม่มีข้อผิดพลาด
+        data: { // สร้างก้อนข้อมูลตัวเลขที่คำนวณเสร็จแล้ว
+            no1: req.body.no_1 * 2, // เอาค่าตัวเลข no_1 ที่หน้าบ้านส่งมาจับคูณด้วย 2
+            no2: req.body.no_2 * 2 // เอาค่าตัวเลข no_2 ที่หน้าบ้านส่งมาจับคูณด้วย 2
+        } // จบก้อนข้อมูลตัวเลข
+    }; // จบก้อนข้อมูลตอบกลับ
+    res.send(JSON.stringify(response)); // แปลงข้อความและส่งผลคูณกลับคืนหน้าบ้านไปใช้งาน
+}); // จบเส้นทางทดสอบคูณสอง
 
-app.get("/api/user/:accountId", async (req, res) => {
-    const accountId = req.params.accountId;
-    const response = await userAccountModel.getUserAccountById(accountId);
-    res.send(JSON.stringify(response));
-});
+app.get("/api/user/:accountId", async (req, res) => { // 3. เส้นทางดึงโปรไฟล์ผู้ใช้เฉพาะคน ผ่านเลขไอดีหลัง URL
+    const accountId = req.params.accountId; // แกะรหัสไอดีผู้ใช้ที่ถูกแนบมาท้ายลิงก์ URL ออกมาเก็บไว้ในตัวแปร
+    const response = await userAccountModel.getUserAccountById(accountId); // สั่งหัวเจาะโมดูลผู้ใช้ดึงค่าโปรไฟล์ตามรหัสไอดีนี้มา
+    res.send(JSON.stringify(response)); // แปลงข้อมูลโปรไฟล์นั้นเป็นตัวหนังสือ JSON แล้วส่งดีดไปให้หน้าบ้านแสดงผล
+}); // จบเส้นทางดึงโปรไฟล์ผู้ใช้
 
 
-const checkAccessToken = (req, res, next) => {
-    let token = null;
+const checkAccessToken = (req, res, next) => { // 🛡️ มิดเดิลแวร์ (ด่านตรวจคนเข้าเมือง) คอยส่องดูตั๋ว Access Token ก่อนเปิดประตู
+    let token = null; // ตั้งกล่องตั๋วเริ่มต้นให้ว่างเปล่า (null) ไว้ก่อนเพื่อรอใส่ของจริง
 
-    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
-        token = req.headers.authorization.split(' ')[1];
-    } else if (req.query && req.query.token) {
-        token = req.query.token;
-    } else {
-        token = req.body.token;
-    }
+    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') { // ถ้าหน้าบ้านแอบพกตั๋วมาในหัวข้อ Authorization รูปแบบ Bearer
+        token = req.headers.authorization.split(' ')[1]; // ทำการแกะตัดเอาเฉพาะรหัสตั๋วตัวยาว ๆ ลำดับที่สองมาเก็บไว้
+    } else if (req.query && req.query.token) { // หรือถ้าหน้าบ้านเลือกแนบตั๋วห้อยท้ายลิงก์ URL มาแทน
+        token = req.query.token; // หยิบเอาตั๋วในช่องคิวรี (Query) นั้นมาเก็บไว้ในกล่อง token
+    } else { // หากหน้าบ้านเลือกแนบตั๋วใส่ถุงพัสดุฝังมาในเนื้อหาหลัก (Body)
+        token = req.body.token; // หยิบเอาตั๋วในเนื้อพัสดุตัวนั้นมาเก็บไว้ใช้งานแทน
+    } // จบการส่องหาตั๋วเดินทาง
 
-    jwt.verify(token)
-    .then((decoded) => {
-        req.decoded = decoded;
-        next();
-    }, (err) => {
-        res.json({
-            isError: false,
-            result: false,
-            errorMessage: "ยังไม่ได้เข้าสู่ระบบ"
-        });
-    });
-}
+    jwt.verify(token) // ส่งตั๋วที่เจอไปตรวจความถูกต้องที่เครื่องส่องพระตั๋ว JWT
+    .then((decoded) => { // กรณีที่ 1: ถ้าส่องแล้วเป็นตั๋วแท้และยังไม่หมดอายุ (ผ่านฉลุย)
+        req.decoded = decoded; // เอาข้อมูลผู้ใช้ที่ฝังอยู่ในตั๋วไปแปะพ่วงไว้ในพัสดุ req เพื่อส่งไปใช้ต่อ
+        next(); // สั่งเปิดประตูด่านตรวจให้ผู้ใช้ผ่านไปทำตามคำสั่งในฟังก์ชันหลักถัดไปได้เลย
+    }, (err) => { // กรณีที่ 2: ถ้าตรวจแล้วพัง เช่น ตั๋วปลอม หมดอายุ หรือลืมพกตั๋วมา
+        res.json({ // จัดรูปแบบส่งข่าวดังต่อไปนี้กลับไปล็อกหน้าจอทันที
+            isError: false, // ส่งสถานะบอกฝั่งแอปให้จับผิด
+            result: false, // บอกว่าผลตรวจล้มเหลว
+            errorMessage: "ยังไม่ได้เข้าสู่ระบบ" // ส่งข้อความฟ้องหน้าแอปว่าตั๋วใช้ไม่ได้หรือยังไม่ได้ล็อกอิน
+        }); // จบการแจ้งเตือน
+    }); // จบกระบวนการส่องตั๋ว
+} // จบด่านตรวจเช็กตั๋วพาสปอร์ต
 
-app.get("/api/exercise/get_all", checkAccessToken, async (req, res) => {
-    const response = await exercises.getAllExercises();//** */
-    res.json(response);
-});
+app.get("/api/exercise/get_all", checkAccessToken, async (req, res) => { // 4. เส้นทางขอดูดรายการท่าออกกำลังกายทั้งหมด (ต้องผ่านด่านตรวจก่อน)
+    const response = await exercises.getAllExercises();//** */ // เรียกหัวเจาะกวาดข้อมูลท่าออกกำลังกายทั้งหมดในฐานข้อมูลขึ้นมาเก็บไว้
+    res.json(response); // ส่งคืนรายการเมนูท่าออกกำลังกายทั้งหมดกลับไปให้แอปเปิดโชว์เป็นตัวเลือก
+}); // จบเส้นทางดึงท่าออกกำลังกาย
 
-app.get("/api/activities/get_all_by_user", checkAccessToken, async (req, res) => {
-    console.log(req.decoded);
-    const accountId = req.decoded.user_id;
-    const response = await activities.getAllActivitiesByUser(accountId);//** */
-    res.json(response);
-});
+app.get("/api/activities/get_all_by_user", checkAccessToken, async (req, res) => { // 5. เส้นทางขอดูกิจกรรมส่วนตัวทั้งหมดของผู้ใช้งาน (ต้องผ่านด่านตรวจก่อน)
+    console.log(req.decoded); // สั่งพ่นข้อมูลผู้ใช้ที่แกะได้จากตั๋วออกทางหน้าจอ Command ตัวดำเพื่อเอาไว้ให้นักพัฒนาดูตรวจสอบ
+    const accountId = req.decoded.user_id; // ดึงรหัสไอดีผู้ใช้ที่ด่านตรวจแกะกล่องฝากไว้มาเป็นตัวกรอง
+    const response = await activities.getAllActivitiesByUser(accountId);//** */ // สั่งดึงประวัติการออกกำลังกายจากฐานข้อมูลมาเฉพาะของไอดีผู้ใช้นี้เท่านั้น
+    res.json(response); // ส่งประวัติการบันทึกกิจกรรมทั้งหมดกลับไปแสดงผลเป็นลิสต์ในหน้าจอแอป Flutter
+}); // จบเส้นทางดึงประวัติกิจกรรมของผู้ใช้
 
-app.post("/api/authen/access_request", async (req, res) => {
-    const authenSignature = req.body.authen_signature;
-    const authenToken = req.body.authen_token;
+app.post("/api/authen/access_request", async (req, res) => { // 🛡️ ด่านที่ 2: เส้นทางขอล็อกอินขั้นสุดท้าย เพื่อรับตั๋ว Access Token ไปใช้ในแอป
+    const authenSignature = req.body.authen_signature; // แกะเอาค่าลายเซ็นดิจิทัลที่แอปหน้าบ้านส่งมาตรวจสอบ
+    const authenToken = req.body.authen_token; // แกะเอาตั๋วใบแรก (Auth Token) ที่เคยแจกไป กลับมาตรวจสอบซ้ำ
 
-    var decoded = jwt.verify(authenToken);
-    let response;
+    var decoded = jwt.verify(authenToken); // ส่งตั๋วใบแรกเข้าเครื่องส่องพระเพื่อแกะรหัสตรวจสอบดูความถูกต้อง
+    let response; // เตรียมสร้างกล่องเปล่าชื่อ response สำหรับเก็บผลลัพธ์ตอบกลับ
 
-    if (decoded) {
-        const result = await userAccountModel.checkAccessRequest(authenSignature, authenToken);
-        console.log(result);
+    if (decoded) { // กรณีที่ 1: ถ้าส่องแล้วพบว่าเป็นตั๋วใบแรกของแท้จริง ๆ 
+        const result = await userAccountModel.checkAccessRequest(authenSignature, authenToken); // ส่งค่าลายเซ็นและตั๋วไปเทียบรหัสผ่านในฐานข้อมูล
+        console.log(result); // สั่งพ่นผลลัพธ์ที่ได้จากฐานข้อมูลออกทางหน้าจอ Command สีดำเพื่อให้นักพัฒนาดู
 
-        if (result.isError) {
-            response = { isError: true, data: "", errorMessage: result.errorMessage };
-        } else {
-            var payload = {
-                user_id: result.data[0].account_id,
-                username: result.data[0].account_username,
-                image_url: result.data[0].account_image_url,
-                date: dateUtils.getCurrentDateForToken() 
-            };
+        if (result.isError) { // ถ้าฐานข้อมูลบอกว่ารหัสผ่านไม่ตรง หรือข้อมูลผิดพลาด
+            response = { isError: true, data: "", errorMessage: result.errorMessage }; // มัดก้อนข้อความแจ้งเออร์เรอร์เตรียมส่งกลับไปฟ้องแอป
+        } else { // แต่ถ้ารหัสผ่านถูกต้องเป๊ะ ตรวจสอบผ่านฉลุย
+            var payload = { // ทำการมัดก้อนข้อมูลจริงของผู้ใช้คนนี้เพื่อเตรียมเอาไปปั๊มตราฝังลงตั๋วเดินทาง
+                user_id: result.data[0].account_id, // แนบรหัสไอดีผู้ใช้จากฐานข้อมูลใส่เข้าไป
+                username: result.data[0].account_username, // แนบชื่อบัญชีผู้ใช้ใส่เข้าไป
+                image_url: result.data[0].account_image_url, // แนบลิงก์รูปภาพโปรไฟล์ใส่เข้าไป
+                date: dateUtils.getCurrentDateForToken()  // ปั๊มตราวันที่ปัจจุบันแบบมีขีดกลางฝังพ่วงเข้าไปด้วย
+            }; // จบก้อนข้อมูลผู้ใช้
 
-            const accessToken = jwt.sign(payload);
-            response = {
-                isError: false,
-                data: {
-                    access_token: accessToken,
-                    image_url: result.data[0].account_image_url
-                },
-                errorMessage: ""
-            }
-        }
-    } else {
-        response = {
-            isError: true,
-            data: "",
-            errorMessage: "ข้อมูลไม่ถูกต้อง"
-        };
-    }
+            const accessToken = jwt.sign(payload); // นำก้อนข้อมูลผู้ใช้ (payload) ไปส่งผลิตเป็นตั๋วใบจริงที่ชื่อ accessToken
+            response = { // มัดก้อนผลลัพธ์ความสำเร็จส่งกลับไปหน้าบ้าน
+                isError: false, // บอกหน้าบ้านว่าล็อกอินสำเร็จเรียบร้อยไม่มีข้อผิดพลาด
+                data: { // แนบแพ็กเกจข้อมูลสำคัญไปในช่อง data
+                    access_token: accessToken, // ส่งตั๋วเดินทางใบจริง (Access Token) ไปให้แอปพกติดตัวไว้ใช้เปิดดูข้อมูลกิจกรรม
+                    image_url: result.data[0].account_image_url // ส่งลิงก์รูปโปรไฟล์ไปให้แอปใช้โหลดขึ้นโชว์บนหน้าจอ
+                }, // จบก้อนแพ็กเกจ
+                errorMessage: "" // ช่องเออร์เรอร์ปล่อยว่างไว้เพราะทำงานผ่านฉลุย
+            } // จบก้อนตอบกลับสำเร็จ
+        } // จบการเช็กผลฐานข้อมูลด่านที่ 2
+    } else { // กรณีที่ 2: ถ้าเอาตั๋วใบแรกมาส่องแล้วพบว่าเป็นตั๋วปลอมหรือหมดอายุตั้งแต่แรก
+        response = { // จัดก้อนข้อความผลลัพธ์ปฏิเสธการเข้าเมือง
+            isError: true, // ตั้งค่าแจ้งเตือนว่าเกิดข้อผิดพลาด
+            data: "", // ข้อมูลส่งกลับปล่อยว่างไว้
+            errorMessage: "ข้อมูลไม่ถูกต้อง" // ส่งข้อความฟ้องว่าตั๋วใบแรกของคุณไม่ผ่านเกณฑ์
+        }; // จบก้อนข้อความปฏิเสธ
+    } // จบการตรวจส่องตั๋วใบแรก
 
-    res.send(JSON.stringify(response));
-});
+    res.send(JSON.stringify(response)); // แปลงก้อนข้อมูลผลลัพธ์ตอบกลับทั้งหมดเป็นข้อความ JSON แล้วดีดส่งกลับไปให้แอป Flutter
+}); // จบเส้นทางล็อกอินด่านที่ 2
 
-app.post("/api/authen/authen_request", async (req, res) => {
-    console.log(req.body.authen_request);
+app.post("/api/authen/authen_request", async (req, res) => { // 🛡️ ด่านที่ 1: เส้นทางตรวจสอบตัวตนผู้ใช้ขั้นแรก (ส่งแค่ชื่อผู้ใช้ที่เข้ารหัสมาเช็กก่อน)
+    console.log(req.body.authen_request); // สั่งพ่นรหัสแฮชด่านแรกที่ส่งมาออกหน้าจอตัวดำเพื่อดูตรวจสอบ
 
-    const authenRequest = req.body.authen_request;
-    const result = await userAccountModel.checkAuthenRequest(authenRequest);
-    console.log(result);
+    const authenRequest = req.body.authen_request; // แกะเอารหัสคำขอตรวจสอบตัวตนด่านแรกเก็บไว้ในตัวแปร
+    const result = await userAccountModel.checkAuthenRequest(authenRequest); // ส่งไปให้หัวเจาะเช็กในตารางผู้ใช้ว่ารหัสนี้มีตัวตนอยู่จริงไหม
+    console.log(result); // สั่งพ่นผลลัพธ์ตรวจตัวตนออกทางหน้าจอเพื่อตรวจสอบ
 
-    let response; 
+    let response;  // เตรียมสร้างกล่องเปล่าชื่อ response สำหรับเก็บผลลัพธ์ตอบกลับด่านแรก
 
-    if (result.isError) {
-        response = { isError: true, data: "", errorMessage: result.errorMessage };
-    } else {
-        var payload = { username: result.data[0].account_username };
-        const authenToken = jwt.sign(payload);
+    if (result.isError) { // ถ้าฐานข้อมูลค้นหาแล้วส่ายหน้า บอกว่าไม่มีชื่อผู้ใช้คนนี้ในระบบ
+        response = { isError: true, data: "", errorMessage: result.errorMessage }; // จัดก้อนข้อความแจ้งข้อผิดพลาดฟ้องกลับไปทันที
+    } else { // แต่ถ้าตรวจสอบแล้วพบว่าผู้ใช้คนนี้มีตัวตนอยู่จริงในระบบ
+        var payload = { username: result.data[0].account_username }; // ดึงเอาชื่อผู้ใช้มามัดใส่ถุงเตรียมทำตั๋วชั่วคราว
+        const authenToken = jwt.sign(payload); // นำชื่อผู้ใช้ไปสั่งปั๊มตราผลิตออกมาเป็นตั๋วใบแรก (Auth Token) 
         
-        response = {
-            isError: false,
-            data: authenToken,
-            errorMessage: ""
-        };
-    }
+        response = { // จัดก้อนข้อมูลตอบกลับด่านแรกสำเร็จ
+            isError: false, // บอกหน้าบ้านว่าด่านแรกผ่านฉลุยจ้า
+            data: authenToken, // ส่งตั๋วใบแรก (Auth Token) กลับไปให้หน้าบ้านถือไว้ เพื่อใช้ยื่นต่อในด่านที่สอง
+            errorMessage: "" // ช่องแจ้งข้อผิดพลาดปล่อยว่างไว้
+        }; // จบก้อนตอบกลับด่านแรก
+    } // จบการเช็กผลฐานข้อมูลด่านที่ 1
 
-    res.send(JSON.stringify(response));
-});
+    res.send(JSON.stringify(response)); // แปลงก้อนผลลัพธ์ด่านแรกเป็นตัวหนังสือ JSON แล้วดีดส่งกลับไปให้แอปหน้าบ้านพกตั๋วใบแรกไว้ใช้งาน
+}); // จบเส้นทางล็อกอินด่านที่ 1
 
-app.listen(port, () => {
-    console.log(`Server running at http://${hostname}:${port}`);
-});
+app.listen(port, () => { // 🚀 สวิตช์หลักสั่งเปิดเครื่องเซิร์ฟเวอร์หลังบ้านให้เริ่มทำงาน
+    console.log(`Server running at http://${hostname}:${port}`); // พ่นข้อความบอกเราบนหน้าจอว่า "ตอนนี้หลังบ้านสตาร์ทเครื่องวิ่งอยู่ที่พอร์ต 3000 แล้วนะจ๊ะ"
+}); // จบคำสั่งเปิดเครื่องเซิร์ฟเวอร์
+
+//โค้ดครึ่งหลังนี้คือระบบ "ล็อกอินรักษาความปลอดภัยแบบแยก 2 จังหวะ" ค่ะอาจารย์:
+
+//จังหวะที่ 1 (authen_request) คือการให้แอปหน้าบ้านส่งรหัสยืนยันตัวตนมาเช็กก่อนว่ามีชื่อผู้ใช้นี้ในระบบไหม
+//  ถ้ามีจริง หลังบ้านจะยังไม่ให้เข้าดูข้อมูลกิจกรรมนะคะ แต่จะจ่ายตั๋วผ่านทางชั่วคราวที่เรียกว่า authenToken กลับไปให้หน้าบ้านถือไว้ก่อน
+
+//จังหวะที่ 2 (access_request) หน้าบ้านจะต้องนำตั๋วชั่วคราวใบนั้น ยื่นมาคู่กับลายเซ็นรหัสผ่านจริง
+// เพื่อให้หลังบ้านเช็กความถูกต้องเป็นขั้นสุดท้าย ถ้ารหัสผ่านตรงกันจริง หลังบ้านถึงจะยอมปล่อยตั๋วเดินทางใบจริงที่ชื่อ accessToken พร้อมส่งรูปโปรไฟล์กลับไปให้แอปใช้ล็อกอินผ่านฉลุยค่ะ!
+
+//และปิดท้ายด้วยคำสั่ง app.listen(3000) ซึ่งทำหน้าที่เป็นปุ่มสตาร์ทเครื่องยนต์ เปิดประตูให้พอร์ต 3000 เริ่มออนไลน์รับคำสั่งจากแอป Flutter ค่ะ
