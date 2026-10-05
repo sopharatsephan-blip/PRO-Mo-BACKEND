@@ -1,12 +1,12 @@
-const mariadb = require('mariadb'); // ดึงคลังคำสั่งสำเร็จรูปเข้ามา เพื่อให้โปรแกรมคุยกับ MariaDB เป็น
-const pool = mariadb.createPool({ // สร้างอ่างเก็บสายเชื่อมต่อฐานข้อมูล แล้วตั้งชื่อตัวแปรว่า pool
-    host: 'localhost',            // กำหนดว่าฐานข้อมูลตั้งอยู่ที่เครื่องคอมพิวเตอร์ปัจจุบันของเราเอง
-    user: 'root',                 // ใส่ชื่อผู้ดูแลระบบหลักในการเข้าฐานข้อมูล คือสิทธิ์ 'root'
-    password: '1234',             // ⚠️ ตรวจสอบให้ตรงกับ HeidiSQL (จาก Log ด้านบนระบุว่า: Yes) ถ้าเป็น 1234 อยู่แล้วก็คงไว้ครับ
-    port: 3307,                   // ⚠️ ตรวจสอบประตูทางเข้า (ถ้าตอนรันใน HeidiSQL เป็นพอร์ตมาตรฐาน 3306 ให้แก้เป็น 3306 นะครับ)
-    database: 'video_summary_nlp', // ✨ แก้ไขตรงนี้! สลับจาก 'my_fitness' มาเป็นฐานข้อมูลวิดีโอ NLP ก้อนใหม่
-    connectionLimit: 5            // สั่งให้เปิดประตูสแตนด์บายรอสายไว้พร้อมกันสูงสุด 5 สาย
+const mariadb = require('mariadb');
+
+const pool = mariadb.createPool({ 
+    host: '127.0.0.1',
+    user: 'root',
+    password: '1234',            // รหัสผ่านตาม HeidiSQL
+    port: 3307,                  // พอร์ตตาม HeidiSQL
+    database: 'video_summary_g15', // ✨ แก้ตรงนี้เป็น video_summary_g15 ให้ตรงกับในรูป
+    connectionLimit: 5
 });
 
-module.exports = pool;            // ส่งออกตัวแปร pool ให้ไฟล์อื่นหยิบไปใช้วิ่งรัน SQL ได้ทันที
-// ตอนนี้ปลั๊กพ่วงสายตรงย้ายมาเสียบค้างไว้กับฐานข้อมูลระบบสรุปเนื้อหาวิดีโอ (video_summary_nlp) เรียบร้อยแล้วครับ!
+module.exports = pool;
