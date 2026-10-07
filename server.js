@@ -1,154 +1,426 @@
-const http = require('http'); // ดึงโมดูลเครื่องมือสร้างเซิร์ฟเวอร์พื้นฐานของ Node.js เข้ามาใช้งาน
-const bp = require('body-parser'); // ดึงตัวแปลงข้อมูล (Body Parser) มาแปลงค่าที่ส่งมาจากหน้าบ้านให้อ่านง่าย
-const express = require('express'); // ดึง Express Framework เข้ามาเพื่อใช้จัดการเส้นทาง (Route) ของเว็บแอป
-const userAccountModel = require('./models/user_account'); // ดึงโมดูลจัดการข้อมูลผู้ใช้และระบบล็อกอินเข้ามาใช้งาน
-const jwt = require('./libs/jwt'); // ดึงระบบสร้างและตรวจสอบตั๋วความปลอดภัย JWT เข้ามาใช้งานในไฟล์นี้
-const dateUtils = require('./libs/date_utils'); // ดึงเครื่องมือสำหรับจัดรูปแบบวันที่ขีดกลางเข้ามาเตรียมใช้
-const cors = require('cors'); // ดึงระบบปลดล็อกความปลอดภัย CORS เพื่ออนุญาตให้แอปต่างที่อยู่เรียกใช้ API นี้ได้
-const app = express(); // ประกาศใช้งานระบบ Express เก็บไว้ในตัวแปร app เพื่อเป็นตัวคุมหลังบ้านหลัก
-
-// ✨ แก้ไข: เรียกใช้งานโมเดลระบบบริษัทและระบบวิดีโอตัวใหม่ให้ตรงกับไฟล์จริงในเครื่อง
-const companies = require('./models/companies'); // ดึงโมดูลจัดการข้อมูลบริษัทเข้ามาใช้งานในไฟล์นี้
-const videos = require('./models/videos'); // ดึงโมดูลจัดการข้อมูลวิดีโอเข้ามาใช้งานในไฟล์นี้
-
-app.use(bp.urlencoded({ extended: true })); // สั่งให้เซิร์ฟเวอร์เปิดรับข้อมูลแบบ Form-URL-Encoded ได้จากหน้าบ้าน
-app.use(bp.json()); // สั่งให้เซิร์ฟเวอร์แปลงข้อมูลที่หน้าบ้านส่งมาให้กลายเป็น JSON อัตโนมัติ
-app.use(cors()); // เปิดสวิตช์ให้แอปหน้าบ้าน (เช่น Flutter) สามารถเชื่อมต่อและดึงข้อมูลจากเว็บนี้ได้
-const hostname = '127.0.0.1'; // กำหนดชื่อที่อยู่ IP ของเซิร์ฟเวอร์จำลอง เป็นเครื่องตัวเอง (localhost)
-const port = 3000; // กำหนดหมายเลขประตู (Port) ของหลังบ้านไว้ที่ช่องทางเลข 3000
+﻿const http = require('http'); 
+const bp = require('body-parser'); 
+const express = require('express'); const path = require('path'); const fs = require('fs'); const multer = require('multer');
+const userAccountModel = require('./models/user_account'); 
+const jwt = require('./libs/jwt'); 
+const dateUtils = require('./libs/date_utils'); 
+const cors = require('cors'); 
+const app = express(); 
 
 
-app.get("/api/users", (req, res) => { // 1. เส้นทางจำลองสำหรับทดสอบดึงข้อมูลผู้ใช้ทั้งหมดแบบธรรมดา
-    var response = { // มัดก้อนข้อมูลตอบกลับสมมุติ
-        isError: true, // ตั้งค่าบอกว่าเกิดข้อผิดพลาดขึ้น
-        data: "You are unauthorized for this data" // ส่งคำปฏิเสธกลับไปว่าคุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้
-    }; // จบก้อนข้อมูลตอบกลับ
-    res.send(JSON.stringify(response)); // แปลงก้อนข้อมูลเป็นตัวหนังสือแล้วส่งดีดกลับไปหาหน้าบ้าน
-}); // จบเส้นทางจำลองดึงข้อมูลผู้ใช้ทั้งหมด
+const companies = require('./models/companies'); 
+const videos = require('./models/videos');
+const supportRequests = require('./models/support_requests');
+const authRegistration = require('./models/auth_registration');
 
-app.post("/api/multiple_by_2", (req, res) => { // 2. เส้นทางทดสอบคณิตศาสตร์ (รับค่าตัวเลขมาคูณสองกลับไป)
-    var response = { // มัดก้อนข้อมูลผลลัพธ์ใส่ตัวแปร response
-        isError: false, // บอกหน้าบ้านว่าระบบทำงานฉลุยไม่มีข้อผิดพลาด
-        data: { // สร้างก้อนข้อมูลตัวเลขที่คำนวณเสร็จแล้ว
-            no1: req.body.no_1 * 2, // เอาค่าตัวเลข no_1 ที่หน้าบ้านส่งมาจับคูณด้วย 2
-            no2: req.body.no_2 * 2 // เอาค่าตัวเลข no_2 ที่หน้าบ้านส่งมาจับคูณด้วย 2
-        } // จบก้อนข้อมูลตัวเลข
-    }; // จบก้อนข้อมูลตอบกลับ
-    res.send(JSON.stringify(response)); // แปลงข้อความและส่งผลคูณกลับคืนหน้าบ้านไปใช้งาน
-}); // จบเส้นทางทดสอบคูณสอง
-
-app.get("/api/user/:accountId", async (req, res) => { // 3. เส้นทางดึงโปรไฟล์ผู้ใช้เฉพาะคน ผ่านเลขไอดีหลัง URL
-    const accountId = req.params.accountId; // แกะรหัสไอดีผู้ใช้ที่ถูกแนบมาท้ายลิงก์ URL ออกมาเก็บไว้ในตัวแปร
-    const response = await userAccountModel.getUserAccountById(accountId); // สั่งหัวเจาะโมดูลผู้ใช้ดึงค่าโปรไฟล์ตามรหัสไอดีนี้มา
-    res.send(JSON.stringify(response)); // แปลงข้อมูลโปรไฟล์นั้นเป็นตัวหนังสือ JSON แล้วส่งดีดไปให้หน้าบ้านแสดงผล
-}); // จบเส้นทางดึงโปรไฟล์ผู้ใช้
+app.use(bp.urlencoded({ extended: true }));
+app.use(bp.json());
+app.use(cors()); const videoUploadDir = path.join(__dirname, 'uploads', 'videos'); fs.mkdirSync(videoUploadDir, { recursive: true }); app.use('/uploads/videos', express.static(videoUploadDir)); const videoStorage = multer.diskStorage({ destination: videoUploadDir, filename: (req, file, cb) => cb(null, require('crypto').randomUUID() + path.extname(file.originalname).toLowerCase()) }); const receiveVideo = multer({ storage: videoStorage, limits: { fileSize: 500 * 1024 * 1024 }, fileFilter: (req, file, cb) => /\.(mp4|mov)$/i.test(file.originalname) ? cb(null, true) : cb(new Error('Only MP4 and MOV files are supported')) });
+const hostname = '127.0.0.1';
+const port = 3000;
 
 
-const checkAccessToken = (req, res, next) => { // 🛡️ มิดเดิลแวร์ (ด่านตรวจคนเข้าเมือง) คอยส่องดูตั๋ว Access Token ก่อนเปิดประตู
-    let token = null; // ตั้งกล่องตั๋วเริ่มต้นให้ว่างเปล่า (null) ไว้ก่อนเพื่อรอใส่ของจริง
+app.get("/api/users", (req, res) => {
+    var response = {
+        isError: true,
+        data: "You are unauthorized for this data"
+    };
+    res.send(JSON.stringify(response));
+});
 
-    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') { // ถ้าหน้าบ้านแอบพกตั๋วมาในหัวข้อ Authorization รูปแบบ Bearer
-        token = req.headers.authorization.split(' ')[1]; // ทำการแกะตัดเอาเฉพาะรหัสตั๋วตัวยาว ๆ ลำดับที่สองมาเก็บไว้
-    } else if (req.query && req.query.token) { // หรือถ้าหน้าบ้านเลือกแนบตั๋วห้อยท้ายลิงก์ URL มาแทน
-        token = req.query.token; // หยิบเอาตั๋วในช่องคิวรี (Query) นั้นมาเก็บไว้ในกล่อง token
-    } else { // หากหน้าบ้านเลือกแนบตั๋วใส่ถุงพัสดุฝังมาในเนื้อหาหลัก (Body)
-        token = req.body.token; // หยิบเอาตั๋วในเนื้อพัสดุตัวนั้นมาเก็บไว้ใช้งานแทน
-    } // จบการส่องหาตั๋วเดินทาง
+app.post("/api/multiple_by_2", (req, res) => {
+    var response = {
+        isError: false,
+        data: {
+            no1: req.body.no_1 * 2,
+            no2: req.body.no_2 * 2
+        }
+    };
+    res.send(JSON.stringify(response));
+});
 
-    jwt.verify(token) // ส่งตั๋วที่เจอไปตรวจความถูกต้องที่เครื่องส่องพระตั๋ว JWT
-    .then((decoded) => { // กรณีที่ 1: ถ้าส่องแล้วเป็นตั๋วแท้และยังไม่หมดอายุ (ผ่านฉลุย)
-        req.decoded = decoded; // เอาข้อมูลผู้ใช้ที่ฝังอยู่ในตั๋วไปแปะพ่วงไว้ในพัสดุ req เพื่อส่งไปใช้ต่อ
-        next(); // สั่งเปิดประตูด่านตรวจให้ผู้ใช้ผ่านไปทำตามคำสั่งในฟังก์ชันหลักถัดไปได้เลย
-    }, (err) => { // กรณีที่ 2: ถ้าตรวจแล้วพัง เช่น ตั๋วปลอม หมดอายุ หรือลืมพกตั๋วมา
-        res.json({ // จัดรูปแบบส่งข่าวดังต่อไปนี้กลับไปล็อกหน้าจอทันที
-            isError: false, // ส่งสถานะบอกฝั่งแอปให้จับผิด
-            result: false, // บอกว่าผลตรวจล้มเหลว
-            errorMessage: "ยังไม่ได้เข้าสู่ระบบ" // ส่งข้อความฟ้องหน้าแอปว่าตั๋วใช้ไม่ได้หรือยังไม่ได้ล็อกอิน
-        }); // จบการแจ้งเตือน
-    }); // จบกระบวนการส่องตั๋ว
-} // จบด่านตรวจเช็กตั๋วพาสปอร์ต
+app.get("/api/user/:accountId", async (req, res) => {
+    const accountId = req.params.accountId;
+    const response = await userAccountModel.getUserAccountById(accountId);
+    res.send(JSON.stringify(response));
+});
 
-// ✨ แก้ไข: เปลี่ยนเส้นทางจากข้อมูลท่าออกกำลังกาย เป็น ข้อมูลบริษัททั้งหมด
-app.get("/api/company/get_all", checkAccessToken, async (req, res) => { // 4. เส้นทางขอดูดรายการบริษัททั้งหมด (ต้องผ่านด่านตรวจก่อน)
-    const response = await companies.getAllCompanies(); // เรียกหัวเจาะกวาดข้อมูลบริษัททั้งหมดในฐานข้อมูลขึ้นมาเก็บไว้
-    res.json(response); // ส่งคืนรายการเมนูบริษัททั้งหมดกลับไปให้แอปเปิดโชว์เป็นตัวเลือก
-}); // จบเส้นทางดึงข้อมูลบริษัท
 
-// ✨ แก้ไข: เปลี่ยนเส้นทางจากข้อมูลกิจกรรม เป็น รายการวิดีโอของผู้ใช้ทั้งหมด
-app.get("/api/video/get_all_by_user", checkAccessToken, async (req, res) => { // 5. เส้นทางขอดูดรายการวิดีโอทั้งหมดของผู้ใช้งาน (ต้องผ่านด่านตรวจก่อน)
-    console.log(req.decoded); // สั่งพ่นข้อมูลผู้ใช้ที่แกะได้จากตั๋วออกทางหน้าจอ Command ตัวดำเพื่อเอาไว้ให้นักพัฒนาดูตรวจสอบ
-    const accountId = req.decoded.user_id; // ดึงรหัสไอดีผู้ใช้ที่ด่านตรวจแกะกล่องฝากไว้มาเป็นตัวกรอง
-    const response = await videos.getAllVideosByUser(accountId); // สั่งดึงรายการประวัติวิดีโอจากฐานข้อมูลมาเฉพาะของไอดีผู้ใช้นี้เท่านั้น
-    res.json(response); // ส่งข้อมูลรายการวิดีโอทั้งหมดกลับไปแสดงผลเป็นลิสต์ในหน้าจอแอป Flutter
-}); // จบเส้นทางดึงรายการวิดีโอของผู้ใช้
+const checkAccessToken = (req, res, next) => {
+    let token = null;
 
-app.post("/api/authen/access_request", async (req, res) => { // 🛡️ ด่านที่ 2: เส้นทางขอล็อกอินขั้นสุดท้าย เพื่อรับตั๋ว Access Token ไปใช้ในแอป
-    const authenSignature = req.body.authen_signature; // แกะเอาค่าลายเซ็นดิจิทัลที่แอปหน้าบ้านส่งมาตรวจสอบ
-    const authenToken = req.body.authen_token; // แกะเอาตั๋วใบแรก (Auth Token) ที่เคยแจกไป กลับมาตรวจสอบซ้ำ
+    if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
+        token = req.headers.authorization.split(' ')[1];
+    } else if (req.query && req.query.token) {
+        token = req.query.token;
+    } else {
+        token = req.body.token;
+    }
 
-    var decoded = jwt.verify(authenToken); // ส่งตั๋วใบแรกเข้าเครื่องส่องพระเพื่อแกะรหัสตรวจสอบดูความถูกต้อง
-    let response; // เตรียมสร้างกล่องเปล่าชื่อ response สำหรับเก็บผลลัพธ์ตอบกลับ
+    jwt.verify(token)
+    .then((decoded) => {
+        req.decoded = decoded;
+        next();
+    }, (err) => {
+        res.json({
+            isError: false,
+            result: false,
+            errorMessage: "ขอภัย คุณไม่ได้รับอนุญาตให้เข้าถึงข้อมูลนี้"
+        });
+    });
+}
 
-    if (decoded) { // กรณีที่ 1: ถ้าส่องแล้วพบว่าเป็นตั๋วใบแรกของแท้จริง ๆ 
-        const result = await userAccountModel.checkAccessRequest(authenSignature, authenToken); // ส่งค่าลายเซ็นและตั๋วไปเทียบรหัสผ่านในฐานข้อมูล
-        console.log(result); // สั่งพ่นผลลัพธ์ที่ได้จากฐานข้อมูลออกทางหน้าจอ Command สีดำเพื่อให้นักพัฒนาดู
+app.post('/api/authen/register', async (req, res) => {
+    const firstName = String(req.body?.firstName || '').trim();
+    const lastName = String(req.body?.lastName || '').trim();
+    const username = String(req.body?.username || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!firstName || !lastName || !username || !email || !password) {
+        return res.status(400).json({ isError: true, errorMessage: 'กรุณากรอกข้อมูลให้ครบ' });
+    }
+    if (firstName.length > 30 || lastName.length > 30 || username.length > 20 || email.length > 50 || password.length < 8) {
+        return res.status(400).json({ isError: true, errorMessage: 'ตรวจสอบความยาวข้อมูลและใช้รหัสผ่านอย่างน้อย 8 ตัวอักษร' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ isError: true, errorMessage: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    }
+    const result = await authRegistration.register({ firstName, lastName, username, email, password });
+    if (result.isError) {
+        const status = result.errorCode === 'DUPLICATE_ACCOUNT' ? 409 : 500;
+        return res.status(status).json(result);
+    }
+    return res.status(201).json(result);
+});
 
-        if (result.isError) { // ถ้าฐานข้อมูลบอกว่ารหัสผ่านไม่ตรง หรือข้อมูลผิดพลาด
-            response = { isError: true, data: "", errorMessage: result.errorMessage }; // มัดก้อนข้อความแจ้งเออร์เรอร์เตรียมส่งกลับไปฟ้องแอป
-        } else { // แต่ถ้ารหัสผ่านถูกต้องเป๊ะ ตรวจสอบผ่านฉลุย
-            var payload = { // ทำการมัดก้อนข้อมูลจริงของผู้ใช้คนนี้เพื่อเตรียมเอาไปปั๊มตราฝังลงตั๋วเดินทาง
-                user_id: result.data[0].UID, // ดึงรหัส UID จริงจากตาราง Customer
-                username: result.data[0].Username, // ดึง Username จริงจากตาราง Customer
-                firstName: result.data[0].FirstName, // ดึง FirstName จริงจากตาราง Customer 
-                date: dateUtils.getCurrentDateForToken()  // ปั๊มตราวันที่ปัจจุบันแบบมีขีดกลางฝังพ่วงเข้าไปด้วย
-            }; // จบก้อนข้อมูลผู้ใช้
+app.post('/api/authen/reset_password', async (req, res) => {
+    const username = String(req.body?.username || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!username || !email || password.length < 8) {
+        return res.status(400).json({ isError: true, errorMessage: 'กรุณากรอกชื่อผู้ใช้ อีเมล และรหัสผ่านอย่างน้อย 8 ตัวอักษร' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ isError: true, errorMessage: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    }
+    const result = await authRegistration.resetPassword({ username, email, password });
+    if (result.isError) {
+        const status = result.errorCode === 'ACCOUNT_NOT_FOUND' ? 404 : 500;
+        return res.status(status).json(result);
+    }
+    return res.json({ isError: false, message: 'Password updated' });
+});
 
-            const accessToken = jwt.sign(payload); // นำก้อนข้อมูลผู้ใช้ (payload) ไปส่งผลิตเป็นตั๋วใบจริงที่ชื่อ accessToken
-            response = { // มัดก้อนผลลัพธ์ความสำเร็จส่งกลับไปหน้าบ้าน
-                isError: false, // บอกหน้าบ้านว่าล็อกอินสำเร็จเรียบร้อยไม่มีข้อผิดพลาด
-                data: { // แนบแพ็กเกจข้อมูลสำคัญไปในช่อง data
-                    access_token: accessToken, // ส่งตั๋วเดินทางใบจริง (Access Token) ไปให้แอปพกติดตัวไว้ใช้เปิดดูข้อมูล
-                    firstName: result.data[0].FirstName // ส่งชื่อจริงไปให้แอปใช้โหลดขึ้นโชว์บนหน้าจอ (ตาราง Customer ไม่มีรูปโปรไฟล์)
-                }, // จบก้อนแพ็กเกจ
-                errorMessage: "" // ช่องเออร์เรอร์ปล่อยว่างไว้เพราะทำงานผ่านฉลุย
-            } // จบก้อนตอบกลับสำเร็จ
-        } // จบการเช็กผลฐานข้อมูลด่านที่ 2
-    } else { // กรณีที่ 2: ถ้าเอาตั๋วใบแรกมาส่องแล้วพบว่าเป็นตั๋วปลอมหรือหมดอายุตั้งแต่แรก
-        response = { // จัดก้อนข้อความผลลัพธ์ปฏิเสธการเข้าเมือง
-            isError: true, // ตั้งค่าแจ้งเตือนว่าเกิดข้อผิดพลาด
-            data: "", // ข้อมูลส่งกลับปล่อยว่างไว้
-            errorMessage: "ข้อมูลไม่ถูกต้อง" // ส่งข้อความฟ้องว่าตั๋วใบแรกของคุณไม่ผ่านเกณฑ์
-        }; // จบก้อนข้อความปฏิเสธ
-    } // จบการตรวจส่องตั๋วใบแรก
+app.post('/api/support/requests', async (req, res) => {
+    try {
+        const requestType = String(req.body?.requestType || '').trim().toUpperCase();
+        const fullName = String(req.body?.fullName || '').trim();
+        const username = String(req.body?.username || '').trim();
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        const message = String(req.body?.message || '').trim();
+        const validType = ['PASSWORD_RESET', 'CONTACT_ADMIN'].includes(requestType);
+        const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    res.send(JSON.stringify(response)); // แปลงก้อนข้อมูลผลลัพธ์ตอบกลับทั้งหมดเป็นข้อความ JSON แล้วดีดส่งกลับไปให้แอป Flutter
-}); // จบเส้นทางล็อกอินด่านที่ 2
+        if (!validType || !validEmail) {
+            return res.status(400).json({ isError: true, errorMessage: 'กรุณาตรวจสอบประเภทคำขอและอีเมล' });
+        }
+        if (requestType === 'PASSWORD_RESET' && (!username || username.length > 100)) {
+            return res.status(400).json({ isError: true, errorMessage: 'กรุณากรอกชื่อผู้ใช้ให้ถูกต้อง' });
+        }
+        if (requestType === 'CONTACT_ADMIN' && (!fullName || !message)) {
+            return res.status(400).json({ isError: true, errorMessage: 'กรุณากรอกชื่อและรายละเอียดที่ต้องการติดต่อ' });
+        }
+        if (fullName.length > 120 || email.length > 254 || message.length > 4000) {
+            return res.status(400).json({ isError: true, errorMessage: 'ข้อมูลยาวเกินกำหนด' });
+        }
 
-app.post("/api/authen/authen_request", async (req, res) => { // 🛡️ ด่านที่ 1: เส้นทางตรวจสอบตัวตนผู้ใช้ขั้นแรก (ส่งแค่ชื่อผู้ใช้ที่เข้ารหัสมาเช็กก่อน)
-    console.log(req.body.authen_request); // สั่งพ่นรหัสแฮชด่านแรกที่ส่งมาออกหน้าจอตัวดำเพื่อดูตรวจสอบ
+        const result = await supportRequests.createRequest({ requestType, fullName, username, email, message });
+        if (result.isError) throw new Error(result.errorMessage);
+        return res.status(201).json({ isError: false, message: 'Request received', data: result.data });
+    } catch (error) {
+        console.error('Support request error:', error.message);
+        return res.status(500).json({ isError: true, errorMessage: 'บันทึกคำขอไม่สำเร็จ กรุณาลองอีกครั้ง' });
+    }
+});
 
-    const authenRequest = req.body.authen_request; // แกะเอารหัสคำขอตรวจสอบตัวตนด่านแรกเก็บไว้ในตัวแปร
-    const result = await userAccountModel.checkAuthenRequest(authenRequest); // ส่งไปให้หัวเจาะเช็กในตารางผู้ใช้ว่ารหัสนี้มีตัวตนอยู่จริงไหม
-    console.log(result); // สั่งพ่นผลลัพธ์ตรวจตัวตนออกทางหน้าจอเพื่อตรวจสอบ
+app.get("/api/company/get_all", checkAccessToken, async (req, res) => {
+    const response = await companies.getAllCompanies();
+    res.json(response);
+});
 
-    let response;  // เตรียมสร้างกล่องเปล่าชื่อ response สำหรับเก็บผลลัพธ์ตอบกลับด่านแรก
+app.post("/api/company/add", checkAccessToken, async (req, res) => {
+    try {
+        const companyName = String(req.body.CompanyName || "").trim();
+        const province = String(req.body.Province || "").trim();
+        const address = String(req.body.Location || "").trim();
+        const phone = req.body.Phone == null ? "" : String(req.body.Phone).trim();
+        const mapUrl = req.body.MapUrl == null ? "" : String(req.body.MapUrl).trim();
+        if (!companyName || !province) {
+            return res.status(400).json({ isError: true, errorMessage: "Company name and province are required" });
+        }
+        if (phone.length > 30 || mapUrl.length > 500 || (mapUrl && !/^https?:\/\//i.test(mapUrl))) {
+            return res.status(400).json({ isError: true, errorMessage: "ตรวจสอบเบอร์โทรและลิงก์แผนที่" });
+        }
+        const result = await companies.getOrCreateCompany(companyName, province, address, phone, mapUrl);
+        return res.status(result.isError ? 400 : 201).json(result);
+    } catch (error) {
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
 
-    if (result.isError) { // ถ้าฐานข้อมูลค้นหาแล้วส่ายหน้า บอกว่าไม่มีชื่อผู้ใช้คนนี้ในระบบ
-        response = { isError: true, data: "", errorMessage: result.errorMessage }; // จัดก้อนข้อความแจ้งข้อผิดพลาดฟ้องกลับไปทันที
-    } else { // แต่ถ้าตรวจสอบแล้วพบว่าผู้ใช้คนนี้มีตัวตนอยู่จริงในระบบ
-        var payload = { username: result.data[0].Username }; // ดึงเอา Username จากตาราง Customer มามัดใส่ถุงเตรียมทำตั๋วชั่วคราว
-        const authenToken = jwt.sign(payload); // นำชื่อผู้ใช้ไปสั่งปั๊มตราผลิตออกมาเป็นตั๋วใบแรก (Auth Token) 
+app.put("/api/company/update/:companyId", checkAccessToken, async (req, res) => {
+    try {
+        const companyId = String(req.params.companyId || "").trim();
+        const companyName = String(req.body.CompanyName || "").trim();
+        const province = String(req.body.Province || "").trim();
+        const address = String(req.body.Location || "").trim();
+        const phone = Object.prototype.hasOwnProperty.call(req.body, 'Phone') ? String(req.body.Phone ?? '').trim() : null;
+        const mapUrl = Object.prototype.hasOwnProperty.call(req.body, 'MapUrl') ? String(req.body.MapUrl ?? '').trim() : null;
+        if ((phone?.length ?? 0) > 30 || (mapUrl?.length ?? 0) > 500) {
+            return res.status(400).json({ isError: true, errorMessage: "Phone or map link is too long" });
+        }
+        if (mapUrl && !/^https?:\/\//i.test(mapUrl)) {
+            return res.status(400).json({ isError: true, errorMessage: "Map link must start with http:// or https://" });
+        }
+        if (!companyId || !companyName || !province) {
+            return res.status(400).json({ isError: true, errorMessage: "Company, name and province are required" });
+        }
+        const result = await companies.updateCompanyDetails(companyId, companyName, province, address, phone, mapUrl);
+        if (result.isError) return res.status(400).json(result);
+        return res.json({ isError: false, message: "Company updated", data: { CompanyID: companyId } });
+    } catch (error) {
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
+
+app.delete("/api/company/delete/:companyId", checkAccessToken, async (req, res) => {
+    try {
+        const companyId = String(req.params.companyId || "").trim();
+        if (!companyId) return res.status(400).json({ isError: true, errorMessage: "Company ID is required" });
+        const result = await companies.deleteCompany(companyId);
+        return res.status(result.isError ? 404 : 200).json(result);
+    } catch (error) {
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
+
+app.get("/api/company/videos_by_province", checkAccessToken, async (req, res) => {
+    const response = await companies.getVideoCountsByProvince();
+    res.json(response);
+});
+
+app.get("/api/company/video_counts", checkAccessToken, async (req, res) => {
+    const response = await companies.getCompanyVideoCounts();
+    res.json(response);
+});
+
+app.get("/api/video/get_all_by_user", checkAccessToken, async (req, res) => {
+    console.log(req.decoded);
+    const accountId = req.decoded.user_id;
+    const response = await videos.getAllVideosByUser(accountId);
+    res.json(response);
+});
+
+app.post("/api/video/add", checkAccessToken, receiveVideo.single("video"), async (req, res) => {
+    try {
+        const videoId = String(req.body.VideoID || (Date.now().toString(36) + require('crypto').randomBytes(5).toString('hex')).slice(0, 20)).trim();
+        let companyId = String(req.body.CompanyID || "").trim() || null;
+        const companyName = String(req.body.CompanyName || "").trim();
+        const province = String(req.body.Province || "").trim();
+        const companyAddress = String(req.body.CompanyAddress || "").trim();
+        if (companyName && province) {
+            const company = await companies.getOrCreateCompany(companyName, province, companyAddress);
+            if (company.isError) return res.status(400).json(company);
+            companyId = company.data.CompanyID;
+        }
+        const externalUrl = String(req.body.VideoURL || "").trim();
+        if (videoId.length > 20) return res.status(400).json({ isError: true, errorMessage: "Video ID must be 20 characters or fewer" });
+        if (!req.file && !externalUrl) return res.status(400).json({ isError: true, errorMessage: "Choose an MP4/MOV file or provide a video URL" });
+        const videoPath = req.file ? "/uploads/videos/" + req.file.filename : externalUrl;
+        const result = await videos.addVideo({ videoId, userId: req.decoded.user_id, companyId, title: String(req.body.VideoTitle || videoId).slice(0, 100), videoPath });
+        if (result.isError && req.file) fs.unlink(req.file.path, () => {});
+        return res.status(result.isError ? 400 : 201).json(result);
+    } catch (error) {
+        if (req.file) fs.unlink(req.file.path, () => {});
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
+app.put("/api/video/update/:videoId", checkAccessToken, receiveVideo.single("video"), async (req, res) => {
+    try {
+        const oldVideoId = req.params.videoId;
+        const newVideoId = String(req.body.VideoID || oldVideoId).trim();
+        let companyId = String(req.body.CompanyID || "").trim() || null;
+        const companyName = String(req.body.CompanyName || "").trim();
+        const province = String(req.body.Province || "").trim();
+        const companyAddress = String(req.body.CompanyAddress || "").trim();
+        const externalUrl = String(req.body.VideoURL || "").trim();
+        if (!newVideoId || newVideoId.length > 20) return res.status(400).json({ isError: true, errorMessage: "Video ID is required (maximum 20 characters)" });
+        if (companyName && province) {
+            const company = companyId
+                ? await companies.updateCompanyDetails(companyId, companyName, province, companyAddress)
+                : await companies.getOrCreateCompany(companyName, province, companyAddress);
+            if (company.isError) return res.status(400).json(company);
+            if (!companyId) companyId = company.data.CompanyID;
+        }
+        const result = await videos.updateVideo({
+            oldVideoId, newVideoId, userId: req.decoded.user_id, companyId,
+            title: String(req.body.VideoTitle || companyName || newVideoId).slice(0, 100), videoPath: req.file ? "/uploads/videos/" + req.file.filename : externalUrl || null
+        });
+        if (result.isError) {
+            if (req.file) fs.unlink(req.file.path, () => {});
+            return res.status(400).json(result);
+        }
+        const oldPath = result.data.oldVideoPath;
+        if (oldPath && oldPath.startsWith("/uploads/videos/") && (req.file || externalUrl)) {
+            fs.unlink(path.join(videoUploadDir, path.basename(oldPath)), () => {});
+        }
+        return res.json({ isError: false, message: "Video updated", data: result.data });
+    } catch (error) {
+        if (req.file) fs.unlink(req.file.path, () => {});
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
+app.delete("/api/video/delete/:videoId", checkAccessToken, async (req, res) => {
+    try {
+        const videoId = String(req.params.videoId || "").trim();
+        const result = await videos.deleteVideo({ videoId, userId: req.decoded.user_id });
+        if (result.isError) return res.status(404).json(result);
+        const videoPath = result.data.VideoPath;
+        if (videoPath && videoPath.startsWith("/uploads/videos/")) {
+            fs.unlink(path.join(videoUploadDir, path.basename(videoPath)), (error) => {
+                if (error && error.code !== "ENOENT") console.error("Unable to remove video file:", error.message);
+            });
+        }
+        return res.json({ isError: false, message: "Video deleted" });
+    } catch (error) {
+        return res.status(500).json({ isError: true, errorMessage: error.message });
+    }
+});
+app.post("/api/authen/login", async (req, res) => {
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!username || !password) {
+        return res.status(400).json({ isError: true, data: '', errorMessage: 'Username and password are required' });
+    }
+
+    const result = await userAccountModel.authenticateUser(username, password);
+    if (result.isError) {
+        const isInvalidLogin = result.errorMessage === 'Invalid username or password';
+        return res.status(isInvalidLogin ? 401 : 500).json({
+            isError: true,
+            data: '',
+            errorMessage: isInvalidLogin ? result.errorMessage : 'Unable to access the user database'
+        });
+    }
+
+    const user = result.data;
+    const accessToken = jwt.sign({
+        user_id: user.UID,
+        username: user.Username,
+        firstName: user.FirstName,
+        date: dateUtils.getCurrentDateForToken()
+    });
+    return res.json({
+        isError: false,
+        data: {
+            access_token: accessToken,
+            user_info: { UID: user.UID, Username: user.Username, FirstName: user.FirstName }
+        },
+        errorMessage: ''
+    });
+});
+app.post("/api/authen/access_request", async (req, res) => {
+    const authenSignature = req.body.authen_signature;
+    const authenToken = req.body.authen_token;
+
+    var decoded = jwt.verify(authenToken);
+    let response;
+
+    if (decoded) {
+        const result = await userAccountModel.checkAccessRequest(authenSignature, authenToken);
+        console.log(result);
+
+        if (result.isError) {
+            response = { isError: true, data: "", errorMessage: result.errorMessage };
+        } else {
+            var payload = {
+                user_id: result.data[0].UID,
+                username: result.data[0].Username,
+                firstName: result.data[0].FirstName,
+                date: dateUtils.getCurrentDateForToken()
+            };
+
+            const accessToken = jwt.sign(payload);
+            response = {
+                isError: false,
+                data: {
+                    access_token: accessToken,
+                    firstName: result.data[0].FirstName
+                },
+                errorMessage: ""
+            }
+        }
+    } else {
+        response = {
+            isError: true,
+            data: "",
+            errorMessage: "ขออภัย คุณไม่ได้รับอนุญาตให้เข้าถึงข้อมูลนี้"
+        };
+    }
+
+    res.send(JSON.stringify(response));
+});
+
+app.post("/api/authen/authen_request", async (req, res) => {
+    console.log(req.body.authen_request);
+
+    const authenRequest = req.body.authen_request;
+    const result = await userAccountModel.checkAuthenRequest(authenRequest);
+    console.log(result);
+
+    let response;
+
+    if (result.isError) {
+        response = { isError: true, data: "", errorMessage: result.errorMessage };
+    } else {
+        var payload = { username: result.data[0].Username };
+        const authenToken = jwt.sign(payload);
         
-        response = { // จัดก้อนข้อมูลตอบกลับด่านแรกสำเร็จ
-            isError: false, // บอกหน้าบ้านว่าด่านแรกผ่านฉลุยจ้า
-            data: authenToken, // ส่งตั๋วใบแรก (Auth Token) กลับไปให้หน้าบ้านถือไว้ เพื่อใช้ยื่นต่อในด่านที่สอง
-            errorMessage: "" // ช่องแจ้งข้อผิดพลาดปล่อยว่างไว้
-        }; // จบก้อนตอบกลับด่านแรก
-    } // จบการเช็กผลฐานข้อมูลด่านที่ 1
+        response = {
+            isError: false,
+            data: authenToken,
+            errorMessage: ""
+        };
+    }
 
-    res.send(JSON.stringify(response)); // แปลงก้อนผลลัพธ์ด่านแรกเป็นตัวหนังสือ JSON แล้วดีดส่งกลับไปให้แอปหน้าบ้านพกตั๋วใบแรกไว้ใช้งาน
-}); // จบเส้นทางล็อกอินด่านที่ 1
+    res.send(JSON.stringify(response));
+});
 
-app.listen(port, () => { // 🚀 สวิตช์หลักสั่งเปิดเครื่องเซิร์ฟเวอร์หลังบ้านให้เริ่มทำงาน
-    console.log(`Server running at http://${hostname}:${port}`); // พ่นข้อความบอกเราบนหน้าจอว่า "ตอนนี้หลังบ้านสตาร์ทเครื่องวิ่งอยู่ที่พอร์ต 3000 แล้วนะจ๊ะ"
-}); // จบคำสั่งเปิดเครื่องเซิร์ฟเวอร์
+app.listen(port, () => {
+    console.log(`Server running at http://${hostname}:${port}`);
+});
+
+
+const pool = require('./libs/db_pool');
+
+async function ensureCompanyProvinceColumn() {
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const columns = await conn.query("SHOW COLUMNS FROM Company LIKE 'Province'");
+        if (columns.length === 0) {
+            await conn.query("ALTER TABLE Company ADD COLUMN Province VARCHAR(100) NULL AFTER Location");
+            console.log('Added Company.Province column');
+        }
+        const phoneColumns = await conn.query("SHOW COLUMNS FROM Company LIKE 'Phone'");
+        if (phoneColumns.length === 0) await conn.query("ALTER TABLE Company ADD COLUMN Phone VARCHAR(30) NULL AFTER Province");
+        const mapColumns = await conn.query("SHOW COLUMNS FROM Company LIKE 'MapUrl'");
+        if (mapColumns.length === 0) await conn.query("ALTER TABLE Company ADD COLUMN MapUrl VARCHAR(500) NULL AFTER Phone");
+    } finally {
+        if (conn) conn.release();
+    }
+}
+
+ensureCompanyProvinceColumn().catch((error) => {
+    console.error('Could not prepare Company columns:', error.message);
+});

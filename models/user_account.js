@@ -1,8 +1,56 @@
 const pool = require('../libs/db_pool'); // ดึงไฟล์อ่างเก็บสายเชื่อมต่อฐานข้อมูลมาใช้งาน เพื่อติดต่อกับฐานข้อมูลใหม่
-const dateUtils = require('../libs/date_utils'); // ดึงไฟล์เครื่องมือจัดวันที่เข้ามาใช้สำหรับทำวันที่ขีดกลางฝังในตั๋ว
+const dateUtils = require('../libs/date_utils');
+const bcrypt = require('bcryptjs'); // Verify bcrypt password hashes
+const crypto = require('crypto');
 
 module.exports = { 
-    getUserAccountById: async (accountId) => { // 1. ฟังก์ชันดึงข้อมูลผู้ใช้จากไอดี (รับ accountId เข้ามา)
+    // ตรวจข้อมูล login กับ Customer รองรับ bcrypt/SHA-256 แล้วคืนข้อมูลสมาชิกเมื่อผ่าน
+    authenticateUser: async (username, password) => {
+        let conn;
+        try {
+            conn = await pool.getConnection();
+            const columns = await conn.query('SHOW COLUMNS FROM Customer');
+            const columnNames = new Set(columns.map((column) => column.Field));
+            const passwordColumn = columnNames.has('Password')
+                ? 'Password'
+                : columnNames.has('account_passwrd')
+                    ? 'account_passwrd'
+                    : null;
+            if (!passwordColumn) {
+                throw new Error('Customer table must contain Password or account_passwrd');
+            }
+
+            const rows = await conn.query(
+                `SELECT UID, Username, FirstName, ${passwordColumn} AS stored_password FROM Customer WHERE Username = ? LIMIT 1`,
+                [username]
+            );
+            if (rows.length === 0 || typeof rows[0].stored_password !== 'string') {
+                return { isError: true, errorMessage: 'Invalid username or password' };
+            }
+
+            const storedPassword = rows[0].stored_password;
+            let passwordMatches = false;
+            if (/^\$2[aby]\$/.test(storedPassword)) {
+                passwordMatches = await bcrypt.compare(password, storedPassword);
+            } else if (/^[a-f0-9]{64}$/i.test(storedPassword)) {
+                const suppliedHash = crypto.createHash('sha256').update(password, 'utf8').digest();
+                const storedHash = Buffer.from(storedPassword, 'hex');
+                passwordMatches = crypto.timingSafeEqual(suppliedHash, storedHash);
+            }
+
+            if (!passwordMatches) {
+                return { isError: true, errorMessage: 'Invalid username or password' };
+            }
+
+            const { stored_password, ...user } = rows[0];
+            return { isError: false, data: user };
+        } catch (error) {
+            console.error('Login database error:', error.message);
+            return { isError: true, errorMessage: error.message };
+        } finally {
+            if (conn) conn.release();
+        }
+    },    getUserAccountById: async (accountId) => { // 1. ฟังก์ชันดึงข้อมูลผู้ใช้จากไอดี (รับ accountId เข้ามา)
         let conn; // conn สำหรับเก็บ connection ไปยัง mariadb 
         let result; // result สำหรับส่งคืนผลลัพธ์การสืบค้นข้อมูล
 
